@@ -1,0 +1,9 @@
+[submodule "WebSocket4Net"]
+	path = WebSocket4Net
+	url = https://github.com/kerryjiang/WebSocket4Net
+[submodule "Zeroconf"]
+	path = Zeroconf
+	url = https://github.com/onovotny/Zeroconf
+[submodule "Newtonsoft.Json"]
+	path = Newtonsoft.Json
+	url = https://github.com/JamesNK/Newtonsoft.Json
