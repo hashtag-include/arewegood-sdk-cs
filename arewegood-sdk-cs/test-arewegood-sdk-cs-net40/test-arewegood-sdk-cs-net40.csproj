@@ -55,6 +55,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="ApiModels.cs" />
+    <Compile Include="E2E.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
