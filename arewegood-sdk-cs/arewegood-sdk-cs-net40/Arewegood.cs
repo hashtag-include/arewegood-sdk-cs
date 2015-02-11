@@ -17,7 +17,10 @@ namespace arewegood
         private bool _wsIsAuthenticated;
         private Queue<string> _buffer;
 
-        public Arewegood(string apiKey, string serviceName = "arewegood-proxy")
+        public event SocketUpHandler SocketUp;
+        public delegate void SocketUpHandler();
+
+        public Arewegood(string apiKey, string serviceName = "_awgproxy._tcp.local.")
         {
             _apiKey = apiKey;
             _serviceName = serviceName;
@@ -60,14 +63,15 @@ namespace arewegood
                     int flag = 0;
                     var proceed = new Task(() => { while (flag == 0) { } });
                     proceed.Start();
-                    byte[] data = null;
-                    _ws.DataReceived += (s, d) => { data = d.Data; };
+                    string data = null;
+                    _ws.MessageReceived += (s, d) => {
+                        data = d.Message; flag = d.Message.Length;
+                    };
                     _ws.Send(new ApiAuthenticationObject(_apiKey).ToString());
                     proceed.Wait();
                     if (data != null && data.Length > 0)
                     {
-                        var jsonString = System.Text.UTF8Encoding.UTF8.GetString(data);
-                        var response = JObject.Parse(jsonString);
+                        var response = JObject.Parse(data);
                         if (response["type"].ToString() == "api_token-response" &&
                             response["data"].ToString() == "OK")
                         {
@@ -77,6 +81,8 @@ namespace arewegood
                     }
                 }
             }).ContinueWith((continuation) => {
+
+              SocketUp.Invoke();
               // write any buffered messages
               if (_ws != null && _ws.State == WebSocketState.Open && _wsIsAuthenticated && _buffer.Count > 0)
               {
@@ -86,7 +92,7 @@ namespace arewegood
             });
         }
 
-        public void Trace(params object[] objs)
+        public void TraceAsync(params object[] objs)
         {
             if (_ws != null && _ws.State == WebSocketState.Open)
             {
@@ -96,6 +102,19 @@ namespace arewegood
             {
                 _buffer.Enqueue(new ApiExceptionObject("trace", objs).ToString());
             }
+        }
+
+        public void Trace(params object[] objs)
+        {
+            if (_ws == null || _ws.State != WebSocketState.Open)
+            {
+                int flag = 0;
+                var proceed = new Task(() => { while (flag == 0) { } });
+                proceed.Start();
+                this.SocketUp += () => { flag = 1; };
+                proceed.Wait();
+            }
+            _ws.Send(new ApiExceptionObject("trace", objs).ToString());
         }
     }
 }
