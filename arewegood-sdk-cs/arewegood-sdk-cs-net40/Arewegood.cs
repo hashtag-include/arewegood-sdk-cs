@@ -56,7 +56,8 @@ namespace arewegood
                         socket = null;
                     }
                 }
-            }).ContinueWith((continuation) => {
+            }).ContinueWith((continuation) =>
+            {
                 // if we did, authenticate it using our auth protocol
                 if (_ws != null && _ws.State == WebSocketState.Open)
                 {
@@ -64,7 +65,8 @@ namespace arewegood
                     var proceed = new Task(() => { while (flag == 0) { } });
                     proceed.Start();
                     string data = null;
-                    _ws.MessageReceived += (s, d) => {
+                    _ws.MessageReceived += (s, d) =>
+                    {
                         data = d.Message; flag = d.Message.Length;
                     };
                     _ws.Send(new ApiAuthenticationObject(_apiKey).ToString());
@@ -80,31 +82,34 @@ namespace arewegood
                         }
                     }
                 }
-            }).ContinueWith((continuation) => {
+            }).ContinueWith((continuation) =>
+            {
 
-              SocketUp.Invoke();
-              // write any buffered messages
-              if (_ws != null && _ws.State == WebSocketState.Open && _wsIsAuthenticated && _buffer.Count > 0)
-              {
-                  foreach (var b in _buffer)
-                      _ws.Send(b);
-              }
+                SocketUp.Invoke();
+                // write any buffered messages
+                if (_ws != null && _ws.State == WebSocketState.Open && _wsIsAuthenticated && _buffer.Count > 0)
+                {
+                    foreach (var b in _buffer)
+                        _ws.Send(b);
+                }
             });
         }
 
-        public void TraceAsync(params object[] objs)
+
+        private void AsyncTest(string type, params object[] objs)
         {
             if (_ws != null && _ws.State == WebSocketState.Open)
             {
-                _ws.Send(new ApiExceptionObject("trace", objs).ToString());
+                _ws.Send(new ApiExceptionObject(type, objs).ToString());
             }
             else
             {
-                _buffer.Enqueue(new ApiExceptionObject("trace", objs).ToString());
+                _buffer.Enqueue(new ApiExceptionObject(type, objs).ToString());
             }
         }
 
-        public void Trace(params object[] objs)
+
+        private void SyncTest(string type, params object[] objs)
         {
             if (_ws == null || _ws.State != WebSocketState.Open)
             {
@@ -114,7 +119,48 @@ namespace arewegood
                 this.SocketUp += () => { flag = 1; };
                 proceed.Wait();
             }
-            _ws.Send(new ApiExceptionObject("trace", objs).ToString());
+            _ws.Send(new ApiExceptionObject(type, objs).ToString());
         }
+
+        public void TraceAsync(params object[] objs)
+        {
+            AsyncTest("trace", objs);
+        }
+
+        public void Trace(params object[] objs)
+        {
+            SyncTest("trace", objs);
+        }
+
+        public void DebugAsync(params object[] objs)
+        {
+            AsyncTest("debug", objs);
+        }
+
+        public void Debug(params object[] objs)
+        {
+            SyncTest("debug", objs);
+        }
+
+        public void Info(params object[] objs)
+        {
+            SyncTest("info", objs);
+        }
+
+        public void InfoAsync(params object[] objs)
+        {
+            AsyncTest("info", objs);
+        }
+
+        public void Error(params object[] objs)
+        {
+            SyncTest("error", objs);
+        }
+
+        public void ErrorAsync(params object[] objs)
+        {
+            AsyncTest("error", objs);
+        }
+
     }
 }
