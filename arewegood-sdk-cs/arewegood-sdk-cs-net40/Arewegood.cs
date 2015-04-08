@@ -5,13 +5,14 @@ using System.Text;
 using WebSocket4Net;
 using Newtonsoft.Json.Linq;
 using Zeroconf;
+using System.Security;
 using System.Threading.Tasks;
 
 namespace arewegood
 {
     public class Arewegood
     {
-        private string _apiKey;
+        private SecureString _apiKey;
         private string _serviceName;
         private WebSocket _ws;
         private bool _wsIsAuthenticated;
@@ -22,13 +23,18 @@ namespace arewegood
 
         public Arewegood(string apiKey, string serviceName = "_awgproxy._tcp.local.")
         {
-            _apiKey = apiKey;
+            
             _serviceName = serviceName;
             _wsIsAuthenticated = false;
             _buffer = new Queue<string>();
 
             // resolve the service and test/find the first valid websocket
             // authenticate it, to
+
+            
+            InitializeApiKey(apiKey);
+            
+
             ZeroconfResolver.ResolveAsync(serviceName).ContinueWith(async (continuation) =>
             {
                 var list = await continuation;
@@ -69,7 +75,7 @@ namespace arewegood
                     {
                         data = d.Message; flag = d.Message.Length;
                     };
-                    _ws.Send(new ApiAuthenticationObject(_apiKey).ToString());
+                    _ws.Send(new ApiAuthenticationObject(_apiKey.ToString()).ToString());
                     proceed.Wait();
                     if (data != null && data.Length > 0)
                     {
@@ -95,8 +101,16 @@ namespace arewegood
             });
         }
 
+       unsafe public void InitializeApiKey(string apiKey)
+       {
+           fixed (char* pChars = apiKey.ToCharArray())
+           {
+               _apiKey = new SecureString(pChars, apiKey.ToCharArray().Length);
 
-        private void AsyncTest(string type, params object[] objs)
+           }
+        }
+
+        private void InternalLogAsync(string type, params object[] objs)
         {
             if (_ws != null && _ws.State == WebSocketState.Open)
             {
@@ -109,7 +123,7 @@ namespace arewegood
         }
 
 
-        private void SyncTest(string type, params object[] objs)
+        private void InternalLogSync(string type, params object[] objs)
         {
             if (_ws == null || _ws.State != WebSocketState.Open)
             {
@@ -124,42 +138,42 @@ namespace arewegood
 
         public void TraceAsync(params object[] objs)
         {
-            AsyncTest("trace", objs);
+            InternalLogAsync("trace", objs);
         }
 
         public void Trace(params object[] objs)
         {
-            SyncTest("trace", objs);
+            InternalLogSync("trace", objs);
         }
 
         public void DebugAsync(params object[] objs)
         {
-            AsyncTest("debug", objs);
+            InternalLogAsync("debug", objs);
         }
 
         public void Debug(params object[] objs)
         {
-            SyncTest("debug", objs);
+            InternalLogSync("debug", objs);
         }
 
         public void Info(params object[] objs)
         {
-            SyncTest("info", objs);
+            InternalLogSync("info", objs);
         }
 
         public void InfoAsync(params object[] objs)
         {
-            AsyncTest("info", objs);
+            InternalLogAsync("info", objs);
         }
 
         public void Error(params object[] objs)
         {
-            SyncTest("error", objs);
+            InternalLogSync("error", objs);
         }
 
         public void ErrorAsync(params object[] objs)
         {
-            AsyncTest("error", objs);
+            InternalLogAsync("error", objs);
         }
 
     }

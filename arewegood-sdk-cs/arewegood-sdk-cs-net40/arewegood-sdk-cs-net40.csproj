@@ -20,6 +20,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,10 +31,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\Newtonsoft.Json\Src\Newtonsoft.Json\bin\Release\Net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
     <Reference Include="SuperSocket.ClientEngine.Common">
       <HintPath>..\..\WebSocket4Net\WebSocket4Net\bin\Release\SuperSocket.ClientEngine.Common.dll</HintPath>
     </Reference>
@@ -50,18 +47,30 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="WebSocket4Net">
-      <HintPath>..\..\WebSocket4Net\WebSocket4Net\bin\Release\WebSocket4Net.dll</HintPath>
-    </Reference>
-    <Reference Include="Zeroconf">
-      <HintPath>..\..\Zeroconf\Zeroconf.NetFx\bin\Release\Zeroconf.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApiAuthenticationObject.cs" />
     <Compile Include="ApiExceptionObject.cs" />
     <Compile Include="Arewegood.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Newtonsoft.Json\Src\Newtonsoft.Json\Newtonsoft.Json.csproj">
+      <Project>{eeea67f9-9089-481d-a4dc-0966dec9fd7d}</Project>
+      <Name>Newtonsoft.Json</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\WebSocket4Net\WebSocket4Net\WebSocket4Net.csproj">
+      <Project>{6920447f-76b1-4739-822e-9ce3a2882718}</Project>
+      <Name>WebSocket4Net</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Zeroconf\Zeroconf.NetFx\Zeroconf.NetFx.csproj">
+      <Project>{23079f74-51a5-4441-af92-559780095aa4}</Project>
+      <Name>Zeroconf.NetFx</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Zeroconf\Zeroconf\Zeroconf.csproj">
+      <Project>{5ea8ce38-6134-4263-9292-8798c7585622}</Project>
+      <Name>Zeroconf</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
