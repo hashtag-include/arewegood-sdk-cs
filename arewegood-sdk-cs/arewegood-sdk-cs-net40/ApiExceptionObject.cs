@@ -10,11 +10,17 @@ namespace arewegood
 {
     public class ApiExceptionObject : JObject
     {
-        public ApiExceptionObject(string type, object data)
+        public ApiExceptionObject(string type, params object[] data)
         {
-            var wrapped = JsonConvert.SerializeObject(data);
+            if (data.Length == 1)
+                this["data"] = JToken.FromObject(data[0]);
+            else
+            {
+                var wrapped = JsonConvert.SerializeObject(data);
+                this["data"] = JsonConvert.DeserializeObject<JToken>(wrapped);
+            }
+
             this["type"] = type;
-            this["data"] = JsonConvert.DeserializeObject<JToken>(wrapped);
         }
     }
 }

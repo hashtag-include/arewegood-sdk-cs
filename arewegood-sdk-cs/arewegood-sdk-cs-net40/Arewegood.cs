@@ -7,16 +7,21 @@ using Newtonsoft.Json.Linq;
 using Zeroconf;
 using System.Security;
 using System.Threading.Tasks;
+using System.Net;
 
 namespace arewegood
 {
     public class Arewegood
     {
-        private SecureString _apiKey;
+        private static int WS_TIMEOUT_MS = 30 * 1000;
+
+        private String _apiKey;
         private string _serviceName;
         private WebSocket _ws;
         private bool _wsIsAuthenticated;
         private Queue<string> _buffer;
+
+        private bool _wsGaveUp = false;
 
         public event SocketUpHandler SocketUp;
         public delegate void SocketUpHandler();
@@ -31,84 +36,126 @@ namespace arewegood
             // resolve the service and test/find the first valid websocket
             // authenticate it, to
 
-            
-            InitializeApiKey(apiKey);
-            
 
-            ZeroconfResolver.ResolveAsync(serviceName).ContinueWith(async (continuation) =>
-            {
-                var list = await continuation;
-                foreach (var host in list)
+            _apiKey = apiKey;
+
+            Task.Delay(WS_TIMEOUT_MS).ContinueWith((continuation) =>
                 {
-                    // try to find a valid ws @ a given service
-                    var possible = "ws://" + host.IPAddress.ToString() + ":" + host.Services[serviceName].Port;
-                    WebSocket socket = new WebSocket(possible);
-                    int flag = 0;
-                    var proceed = new Task<int>(() => { while (flag == 0) { } return flag; });
-                    proceed.Start();
-                    socket.Open();
-                    socket.Error += (s, e) => { flag = 1; };
-                    socket.Opened += (s, a) => { flag = 2; };
-                    proceed.Wait();
-                    var result = proceed.Result;
-                    if (result == 2)
+                    _wsGaveUp = true;
+                    JObject obj = new JObject();
+                    obj["logs"] = new JArray();
+                    foreach (var buf in _buffer)
                     {
-                        _ws = socket;
-                        break;
+                        ((JArray)obj["logs"]).Add(buf);
                     }
-                    else
-                    {
-                        socket.Close();
-                        socket = null;
-                    }
-                }
-            }).ContinueWith((continuation) =>
+                    MakeRawHttp(obj.ToString());
+                    _buffer.Clear();
+                });
+
+            try
             {
-                // if we did, authenticate it using our auth protocol
-                if (_ws != null && _ws.State == WebSocketState.Open)
+                ZeroconfResolver.ResolveAsync(serviceName).ContinueWith(async (continuation) =>
                 {
-                    int flag = 0;
-                    var proceed = new Task(() => { while (flag == 0) { } });
-                    proceed.Start();
-                    string data = null;
-                    _ws.MessageReceived += (s, d) =>
+                    var list = await continuation;
+                    foreach (var host in list)
                     {
-                        data = d.Message; flag = d.Message.Length;
-                    };
-                    _ws.Send(new ApiAuthenticationObject(_apiKey.ToString()).ToString());
-                    proceed.Wait();
-                    if (data != null && data.Length > 0)
-                    {
-                        var response = JObject.Parse(data);
-                        if (response["type"].ToString() == "api_token-response" &&
-                            response["data"].ToString() == "OK")
+                        // try to find a valid ws @ a given service
+                        var possible = "ws://" + host.IPAddress.ToString() + ":" + host.Services[serviceName].Port;
+                        WebSocket socket = new WebSocket(possible);
+                        int flag = 0;
+                        var proceed = new Task<int>(() => { while (flag == 0) { } return flag; });
+                        proceed.Start();
+                        socket.Open();
+                        socket.Error += (s, e) => { flag = 1; };
+                        socket.Opened += (s, a) => { flag = 2; };
+                        proceed.Wait();
+                        var result = proceed.Result;
+                        if (result == 2)
                         {
-                            // ok, we're authenticated!
-                            _wsIsAuthenticated = true;
+                            _ws = socket;
+                            break;
+                        }
+                        else
+                        {
+                            socket.Close();
+                            socket = null;
                         }
                     }
-                }
-            }).ContinueWith((continuation) =>
-            {
-
-                SocketUp.Invoke();
-                // write any buffered messages
-                if (_ws != null && _ws.State == WebSocketState.Open && _wsIsAuthenticated && _buffer.Count > 0)
+                }).ContinueWith((continuation) =>
                 {
-                    foreach (var b in _buffer)
-                        _ws.Send(b);
-                }
-            });
+                    // if we did, authenticate it using our auth protocol
+                    if (_ws != null && _ws.State == WebSocketState.Open)
+                    {
+                        int flag = 0;
+                        var proceed = new Task(() => { while (flag == 0) { } });
+                        proceed.Start();
+                        string data = null;
+                        _ws.MessageReceived += (s, d) =>
+                        {
+                            data = d.Message; flag = d.Message.Length;
+                        };
+                        _ws.Send(new ApiAuthenticationObject(_apiKey.ToString()).ToString());
+                        proceed.Wait();
+                        if (data != null && data.Length > 0)
+                        {
+                            var response = JObject.Parse(data);
+                            if (response["type"].ToString() == "api_token-response" &&
+                                response["data"].ToString() == "OK")
+                            {
+                                // ok, we're authenticated!
+                                _wsIsAuthenticated = true;
+                            }
+                        }
+                    }
+                }).ContinueWith((continuation) =>
+                {
+
+                    SocketUp.Invoke();
+                    // write any buffered messages
+                    if (_ws != null && _ws.State == WebSocketState.Open && _wsIsAuthenticated && _buffer.Count > 0)
+                    {
+                        foreach (var b in _buffer)
+                            _ws.Send(b);
+                        _buffer.Clear();
+                    }
+                });
+            } catch (TypeInitializationException)
+            {
+                _wsGaveUp = true;
+            }
         }
 
-       unsafe public void InitializeApiKey(string apiKey)
+
+       private HttpStatusCode MakeHttp(string sev, params object[] objs)
        {
-           fixed (char* pChars = apiKey.ToCharArray())
-           {
-               _apiKey = new SecureString(pChars, apiKey.ToCharArray().Length);
+           var obj = new ApiExceptionObject(sev, objs);
+           JObject o = new JObject();
+           o["logs"] = new JArray();
+           ((JArray)o["logs"]).Add(obj);
 
+           return MakeRawHttp(o.ToString());
+       }
+
+       private HttpStatusCode MakeRawHttp(string body)
+       {
+           var req = WebRequest.CreateHttp("https://api.arewegood.io/logs?access_token="+_apiKey);
+           req.Method = "POST";
+           req.ContentType = "application/json";
+           var stream = req.GetRequestStream();
+           var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+
+           stream.Write(bytes, 0, bytes.Length);
+           stream.Close();
+           try
+           {
+               var res = (HttpWebResponse)req.GetResponse();
+               return res.StatusCode;
            }
-        }
+           catch (WebException e)
+           {
+               return HttpStatusCode.Unauthorized;
+           }
+       }
 
         private void InternalLogAsync(string type, params object[] objs)
         {
@@ -116,24 +163,35 @@ namespace arewegood
             {
                 _ws.Send(new ApiExceptionObject(type, objs).ToString());
             }
-            else
+            else if (!_wsGaveUp)
             {
                 _buffer.Enqueue(new ApiExceptionObject(type, objs).ToString());
+            }
+            else
+            {
+                MakeHttp(type, objs);
             }
         }
 
 
         private void InternalLogSync(string type, params object[] objs)
         {
-            if (_ws == null || _ws.State != WebSocketState.Open)
+            if (!_wsGaveUp)
             {
-                int flag = 0;
-                var proceed = new Task(() => { while (flag == 0) { } });
-                proceed.Start();
-                this.SocketUp += () => { flag = 1; };
-                proceed.Wait();
+                if (_ws == null || _ws.State != WebSocketState.Open)
+                {
+                    int flag = 0;
+                    var proceed = new Task(() => { while (flag == 0) { } });
+                    proceed.Start();
+                    this.SocketUp += () => { flag = 1; };
+                    proceed.Wait();
+                }
+                _ws.Send(new ApiExceptionObject(type, objs).ToString());
             }
-            _ws.Send(new ApiExceptionObject(type, objs).ToString());
+            else
+            {
+                MakeHttp(type, objs);
+            }
         }
 
         public void TraceAsync(params object[] objs)
